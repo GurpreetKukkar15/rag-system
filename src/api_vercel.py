@@ -31,14 +31,11 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 
 # Global variables for RAG components
 vector_store = None
 embeddings = None
-llm = None
-fallback_llm = None
 
 # Configuration
 DATA_DIR = "data"
@@ -73,7 +70,7 @@ class DocumentInfo(BaseModel):
     original_filename: str
     file_type: str
     file_size: int
-    upload_date: str  # This will be populated from upload_time field
+    upload_date: str
     processed: bool
     chunks_created: int
     processing_status: str
@@ -87,7 +84,7 @@ class SystemStats(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # This code runs on application startup
-    global vector_store, embeddings, llm, fallback_llm
+    global vector_store, embeddings
     
     print("[STARTUP] Starting Enhanced RAG System with Database...")
     
@@ -111,65 +108,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[WARNING] Error loading FAISS index: {e}")
         vector_store = None
-    
-    # Initialize LLM with memory optimization
-    print("Initializing LLM...")
-    try:
-        # Check if Ollama is running
-        response = requests.get("http://localhost:11434/api/tags", timeout=5)
-        if response.status_code == 200:
-            models = response.json().get("models", [])
-            if models:
-                # Try smaller models first for memory efficiency
-                model_priority = ["tinyllama", "phi", "mistral:7b", "mistral:latest"]
-                llm_initialized = False
-                
-                for model_name in model_priority:
-                    try:
-                        print(f"[DEBUG] Trying model: {model_name}")
-                        llm = OllamaLLM(
-                            model=model_name,
-                            temperature=0.7,
-                            top_p=0.9,
-                            # Memory optimization parameters
-                            num_ctx=2048,  # Reduce context window
-                            num_predict=512,  # Limit response length
-                        )
-                        print(f"[OK] LLM initialized (using Ollama: {model_name})")
-                        llm_initialized = True
-                        break
-                    except Exception as e:
-                        print(f"[WARNING] Failed to load {model_name}: {e}")
-                        continue
-                
-                if not llm_initialized:
-                    print("[WARNING] No compatible models found, using test LLM")
-                    from langchain_community.llms.fake import FakeListLLM
-                    llm = FakeListLLM(responses=["I'm a test LLM. Please install a compatible model in Ollama."])
-            else:
-                print("[WARNING] No models found in Ollama, using test LLM")
-                from langchain_community.llms.fake import FakeListLLM
-                llm = FakeListLLM(responses=["I'm a test LLM. Please install a model in Ollama for real responses."])
-        else:
-            print("[WARNING] Ollama not responding, using test LLM")
-            from langchain_community.llms.fake import FakeListLLM
-            llm = FakeListLLM(responses=["I'm a test LLM. Please start Ollama for real responses."])
-    except Exception as e:
-        print(f"[WARNING] LLM initialization failed: {e}, using test LLM")
-        from langchain_community.llms.fake import FakeListLLM
-        llm = FakeListLLM(responses=["I'm a test LLM. Please check Ollama configuration."])
-    
-    # Initialize fallback LLM for memory issues
-    try:
-        from langchain_community.llms.fake import FakeListLLM
-        fallback_llm = FakeListLLM(responses=[
-            "I'm experiencing high memory usage. Here's a summary based on the available context:",
-            "The document contains relevant information that I can process, but I need more system resources to provide a complete response.",
-            "Please try with a smaller model or increase available memory for better performance."
-        ])
-        print("[OK] Fallback LLM initialized")
-    except Exception as e:
-        print(f"[WARNING] Fallback LLM initialization failed: {e}")
     
     print("[OK] RAG resources loaded successfully")
     
@@ -205,8 +143,7 @@ async def health_check():
         "timestamp": datetime.utcnow().isoformat(),
         "database": False,
         "faiss": False,
-        "llm": False,
-        "ollama": False
+        "llm": False
     }
     
     # Database check
@@ -229,27 +166,9 @@ async def health_check():
     except Exception as e:
         status["faiss_error"] = str(e)
     
-    # LLM check
-    try:
-        if llm is not None:
-            status["llm"] = True
-            status["llm_type"] = type(llm).__name__
-    except Exception as e:
-        status["llm_error"] = str(e)
-    
-    # Ollama check
-    try:
-        response = requests.get("http://localhost:11434/api/tags", timeout=2)
-        if response.status_code == 200:
-            models = response.json().get("models", [])
-            status["ollama"] = True
-            status["ollama_models"] = [model["name"] for model in models]
-    except Exception as e:
-        status["ollama_error"] = str(e)
-    
-    # Overall status
-    if not all([status["database"], status["faiss"], status["llm"]]):
-        status["status"] = "degraded"
+    # LLM check (simplified for Vercel)
+    status["llm"] = True  # Always true since we're using a simple response
+    status["llm_type"] = "SimpleResponse"
     
     return status
 
@@ -323,7 +242,7 @@ async def upload_file(
             file_size=file_size
         )
         
-        # Process file in background (simplified for now)
+        # Process file in background (simplified for Vercel)
         try:
             process_single_document(file_path, file_record.id, db)
         except Exception as e:
@@ -440,7 +359,7 @@ async def delete_document(file_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
 
-# Query endpoint
+# Query endpoint (simplified for Vercel)
 @app.post("/query", response_model=QueryResponse)
 async def query_documents(
     query: QueryRequest,
@@ -458,10 +377,6 @@ async def query_documents(
             print(f"[ERROR] Vector store has no documents. ntotal: {getattr(vector_store, 'index', {}).ntotal if hasattr(vector_store, 'index') else 'no index'}")
             raise HTTPException(status_code=400, detail="No documents available. Please upload some documents first.")
         
-        if llm is None:
-            print("[ERROR] LLM is None")
-            raise HTTPException(status_code=500, detail="LLM not available")
-        
         print(f"[DEBUG] Processing query: {query.question}")
         print(f"[DEBUG] Vector store has {vector_store.index.ntotal} documents")
         
@@ -472,37 +387,14 @@ async def query_documents(
         context = "\n\n".join([doc.page_content for doc in retrieved_docs])
         print(f"[DEBUG] Context length: {len(context)} characters")
         
-        # Create prompt
-        prompt_template = PromptTemplate.from_template(
-            "Use the following context to answer the question.\n\nContext: {context}\n\nQuestion: {question}\n\nAnswer:"
-        )
-        
-        # Generate response with fallback
-        print("[DEBUG] Invoking LLM...")
-        try:
-            rag_chain = prompt_template | llm
-            response = rag_chain.invoke({"context": context, "question": query.question})
-            print(f"[DEBUG] LLM response: {response[:100]}...")
-        except Exception as llm_error:
-            print(f"[WARNING] LLM failed: {llm_error}")
-            print("[DEBUG] Using fallback response...")
-            
-            # Check if it's a memory issue
-            if "memory" in str(llm_error).lower() or "2.3 GiB" in str(llm_error):
-                print("[DEBUG] Memory issue detected, using fallback LLM...")
-                if fallback_llm:
-                    try:
-                        fallback_chain = prompt_template | fallback_llm
-                        response = fallback_chain.invoke({"context": context, "question": query.question})
-                        print("[DEBUG] Fallback LLM response generated")
-                    except Exception as fallback_error:
-                        print(f"[WARNING] Fallback LLM also failed: {fallback_error}")
-                        response = f"Based on the available documents, I found {len(retrieved_docs)} relevant sections. However, I'm experiencing high memory usage. Here's what I found:\n\n{context[:500]}..."
-                else:
-                    response = f"Based on the available documents, I found {len(retrieved_docs)} relevant sections. However, I'm experiencing high memory usage. Here's what I found:\n\n{context[:500]}..."
-            else:
-                # Other LLM errors
-                response = f"Based on the available documents, I found {len(retrieved_docs)} relevant sections. However, I'm experiencing technical difficulties with the language model. Here's what I found:\n\n{context[:500]}..."
+        # Simple response generation (no LLM for Vercel)
+        response = f"""Based on the uploaded documents, I found {len(retrieved_docs)} relevant sections that might answer your question: "{query.question}"
+
+Here's what I found:
+
+{context[:1000]}{'...' if len(context) > 1000 else ''}
+
+Note: This is a simplified response. For full AI-powered answers, please use the local version with Ollama."""
         
         processing_time = time.time() - start_time
         

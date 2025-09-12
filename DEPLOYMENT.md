@@ -1,198 +1,118 @@
 # RAG System Deployment Guide
 
-## 🚀 Phase 3: Containerization and Cloud Deployment
+## 🚀 Deploy to Vercel (Free Tier)
 
-This guide will help you containerize your RAG system and deploy it to AWS EC2.
+### Prerequisites
+1. **GitHub Account** - Create one at [github.com](https://github.com)
+2. **Vercel Account** - Sign up at [vercel.com](https://vercel.com)
+3. **Git** - Already installed on your system
 
-## Prerequisites
-
-- Docker Desktop installed and running
-- AWS Account (free tier eligible)
-- Docker Hub account (free)
-
-## Step 1: Local Docker Testing
-
-### 1.1 Build the Docker Image
-
+### Step 1: Initialize Git Repository
 ```bash
-# Make sure Docker Desktop is running
-docker build -t rag-system-image .
-
-# Check if the image was created
-docker images | grep rag-system-image
+# In your project directory
+git init
+git add .
+git commit -m "Initial commit: RAG System ready for deployment"
 ```
 
-### 1.2 Test the Container Locally
+### Step 2: Create GitHub Repository
+1. Go to [github.com](https://github.com)
+2. Click "New repository"
+3. Name it: `rag-system`
+4. Make it **Public** (required for free Vercel)
+5. Don't initialize with README (you already have files)
+6. Click "Create repository"
 
+### Step 3: Push to GitHub
 ```bash
-# Run the container
-docker run -p 8000:8000 rag-system-image
+# Add GitHub remote (replace YOUR_USERNAME with your GitHub username)
+git remote add origin https://github.com/YOUR_USERNAME/rag-system.git
 
-# Test the API (in another terminal)
-curl http://localhost:8000/
-curl -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What is RAG?"}'
+# Push to GitHub
+git branch -M main
+git push -u origin main
 ```
 
-## Step 2: Deploy to Docker Hub
+### Step 4: Deploy to Vercel
+1. Go to [vercel.com](https://vercel.com)
+2. Click "New Project"
+3. Import your GitHub repository: `rag-system`
+4. Vercel will auto-detect Python
+5. **Important Settings:**
+   - **Framework Preset**: Other
+   - **Root Directory**: Leave empty (uses root)
+   - **Build Command**: Leave empty
+   - **Output Directory**: Leave empty
+   - **Install Command**: `pip install -r requirements.txt`
+6. Click "Deploy"
 
-### 2.1 Login to Docker Hub
+### Step 5: Environment Variables (Optional)
+In Vercel dashboard, go to your project → Settings → Environment Variables:
+- `PYTHONPATH`: `/var/task`
+- `OLLAMA_URL`: `https://your-ollama-instance.com` (if using external Ollama)
 
-```bash
-docker login
-# Enter your Docker Hub username and password
+### Step 6: Test Your Deployment
+1. Vercel will give you a URL like: `https://rag-system-abc123.vercel.app`
+2. Visit the URL to test your RAG system
+3. Upload documents and test queries
+
+## 🔧 Important Notes for Vercel
+
+### Limitations
+- **No persistent storage** - Files uploaded will be lost on restart
+- **No Ollama support** - Vercel doesn't support Ollama
+- **10-second timeout** - For free tier
+
+### Solutions
+1. **For file storage**: Use external storage (AWS S3, Google Cloud Storage)
+2. **For Ollama**: Use external Ollama service or switch to OpenAI API
+3. **For database**: Use external database (PlanetScale, Supabase, etc.)
+
+### Alternative: Railway Deployment
+For better Python support with persistent storage:
+
+1. Go to [railway.app](https://railway.app)
+2. Connect GitHub repository
+3. Deploy with these settings:
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `python main.py`
+
+## 📁 Project Structure for Deployment
+```
+rag-system/
+├── .gitignore
+├── requirements.txt
+├── vercel.json
+├── main.py
+├── DEPLOYMENT.md
+└── src/
+    ├── api.py
+    ├── database.py
+    └── init_db.py
 ```
 
-### 2.2 Tag and Push the Image
-
-```bash
-# Replace 'your-username' with your actual Docker Hub username
-docker tag rag-system-image your-username/rag-system-image:latest
-docker push your-username/rag-system-image:latest
-```
-
-## Step 3: Deploy to AWS EC2
-
-### 3.1 Launch an EC2 Instance
-
-1. Go to AWS Management Console
-2. Navigate to EC2 dashboard
-3. Click "Launch instance"
-4. Choose:
-   - **AMI**: Ubuntu Server 22.04 LTS (Free tier eligible)
-   - **Instance Type**: t2.micro (Free tier eligible)
-   - **Key Pair**: Create new or use existing
-   - **Security Group**: Add inbound rule for port 8000 from 0.0.0.0/0
-5. Launch the instance
-
-### 3.2 Connect to EC2 Instance
-
-```bash
-# Replace with your key file and public IP
-ssh -i "your-key-pair.pem" ubuntu@ec2-xx-xx-xx-xx.us-west-2.compute.amazonaws.com
-```
-
-### 3.3 Install Docker on EC2
-
-```bash
-# Update system
-sudo apt-get update
-
-# Install Docker
-sudo apt-get install docker.io -y
-
-# Start and enable Docker
-sudo systemctl start docker
-sudo systemctl enable docker
-
-# Add user to docker group (optional, for running without sudo)
-sudo usermod -aG docker ubuntu
-```
-
-### 3.4 Deploy Your Application
-
-```bash
-# Pull your image from Docker Hub
-docker pull your-username/rag-system-image:latest
-
-# Run the container
-docker run -d -p 8000:8000 --name rag-system your-username/rag-system-image:latest
-
-# Check if container is running
-docker ps
-
-# View logs
-docker logs rag-system
-```
-
-### 3.5 Test Your Deployed Application
-
-```bash
-# Test health check
-curl http://localhost:8000/
-
-# Test query endpoint
-curl -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What is RAG?"}'
-```
-
-## Step 4: Access Your Application
-
-Your RAG system is now live! You can access it at:
-- **Health Check**: `http://your-ec2-public-ip:8000/`
-- **Query Endpoint**: `http://your-ec2-public-ip:8000/query`
-
-## Troubleshooting
+## 🐛 Troubleshooting
 
 ### Common Issues
+1. **Import errors**: Check `PYTHONPATH` in vercel.json
+2. **Module not found**: Ensure all dependencies in requirements.txt
+3. **File uploads fail**: Vercel has no persistent storage
+4. **Ollama not working**: Use external Ollama service
 
-1. **Docker not running**: Make sure Docker Desktop is started
-2. **Port already in use**: Stop other services using port 8000
-3. **EC2 connection refused**: Check security group rules
-4. **Container won't start**: Check logs with `docker logs rag-system`
-
-### Useful Commands
-
+### Debug Commands
 ```bash
-# Stop the container
-docker stop rag-system
+# Test locally
+python main.py
 
-# Remove the container
-docker rm rag-system
+# Check dependencies
+pip list
 
-# Restart the container
-docker restart rag-system
-
-# View container logs
-docker logs -f rag-system
-
-# Access container shell
-docker exec -it rag-system /bin/bash
+# Test API
+curl http://localhost:8000/api/health
 ```
 
-## Production Considerations
-
-### Security
-- Use environment variables for sensitive data
-- Implement authentication
-- Use HTTPS in production
-- Restrict security group access
-
-### Performance
-- Use larger EC2 instances for production
-- Implement caching
-- Add load balancing for high traffic
-- Monitor resource usage
-
-### Monitoring
-- Set up CloudWatch monitoring
-- Implement health checks
-- Add logging and alerting
-- Monitor costs
-
-## Cost Optimization
-
-- Use spot instances for non-critical workloads
-- Implement auto-scaling
-- Monitor and optimize resource usage
-- Use reserved instances for predictable workloads
-
-## Next Steps
-
-1. **Add Domain**: Use Route 53 to add a custom domain
-2. **SSL Certificate**: Implement HTTPS with Let's Encrypt
-3. **Load Balancer**: Add Application Load Balancer for high availability
-4. **Database**: Add persistent storage for larger document collections
-5. **CI/CD**: Implement automated deployment pipeline
-
----
-
-## 🎉 Congratulations!
-
-You have successfully deployed a complete RAG system to the cloud! Your application is now:
-- ✅ Containerized with Docker
-- ✅ Deployed to AWS EC2
-- ✅ Accessible from anywhere on the internet
-- ✅ Scalable and production-ready
+## 🎉 Success!
+Once deployed, your RAG system will be available at:
+- **Vercel URL**: `https://your-project.vercel.app`
+- **API Docs**: `https://your-project.vercel.app/docs`
+- **Health Check**: `https://your-project.vercel.app/api/health`

@@ -1,30 +1,69 @@
-# Virtual environment
-venv/
-env/
-ENV/
-
-# Python cache files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# FAISS index files
-*.faiss
-*.pkl
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
 
 # Environment variables
 .env
 .env.local
-.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# IDE files
+# Database
+*.db
+*.sqlite
+*.sqlite3
+rag_system.db
+
+# FAISS Vector Store
+data/faiss_index/
+data/
+
+# Uploads
+uploads/
+static/uploads/
+
+# Logs
+logs/
+*.log
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# OS generated files
+# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -33,10 +72,55 @@ __pycache__/
 ehthumbs.db
 Thumbs.db
 
-# Logs
-*.log
-logs/
-
 # Temporary files
 *.tmp
 *.temp
+temp/
+tmp/
+
+# Node modules (if any)
+node_modules/
+
+# Vercel
+.vercel/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Backup files
+*.backup
+*.bak

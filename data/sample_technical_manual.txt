@@ -1,0 +1,70 @@
+# Technical Manual: RAG System Implementation
+
+## Overview
+This document provides comprehensive guidance on implementing a Retrieval-Augmented Generation (RAG) system for document-based question answering.
+
+## Architecture Components
+
+### 1. Document Ingestion
+The document ingestion process involves several key steps:
+- Loading PDF documents from the data directory
+- Splitting documents into manageable chunks
+- Creating vector embeddings using sentence transformers
+- Storing embeddings in a FAISS vector database
+
+### 2. Text Processing
+Text processing is crucial for effective retrieval:
+- Use RecursiveCharacterTextSplitter for optimal chunking
+- Maintain chunk overlap to preserve context
+- Set appropriate chunk size (typically 1000 characters)
+- Ensure chunks are semantically meaningful
+
+### 3. Vector Database
+FAISS (Facebook AI Similarity Search) provides efficient similarity search:
+- Supports both CPU and GPU implementations
+- Enables fast nearest neighbor search
+- Scales well with large document collections
+- Provides persistent storage capabilities
+
+### 4. Embedding Models
+Sentence transformers are ideal for RAG systems:
+- all-MiniLM-L6-v2: Fast and efficient for most use cases
+- all-mpnet-base-v2: Higher quality but slower
+- Choose based on speed vs. accuracy requirements
+
+## Implementation Best Practices
+
+### Chunk Size Optimization
+- Too small: Loses context and meaning
+- Too large: Reduces retrieval precision
+- Recommended: 500-1500 characters with 10-20% overlap
+
+### Embedding Considerations
+- Use consistent embedding model for training and inference
+- Consider domain-specific models for specialized content
+- Regular model updates may require re-indexing
+
+### Performance Tuning
+- Batch processing for large document collections
+- Monitor memory usage during ingestion
+- Implement progress tracking for long-running processes
+
+## Troubleshooting
+
+### Common Issues
+1. Memory errors during large document processing
+   - Solution: Process documents in smaller batches
+   
+2. Poor retrieval quality
+   - Solution: Adjust chunk size and overlap parameters
+   
+3. Slow ingestion speed
+   - Solution: Use GPU acceleration or optimize chunking strategy
+
+### Error Handling
+- Validate PDF file integrity before processing
+- Implement retry logic for network-dependent operations
+- Log errors for debugging and monitoring
+
+## Conclusion
+A well-implemented RAG system requires careful attention to document processing, embedding quality, and retrieval optimization. Following these guidelines will help ensure successful implementation and deployment.

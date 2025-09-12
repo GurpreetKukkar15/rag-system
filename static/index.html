@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG System - Document Q&A</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-brain"></i> RAG System</h1>
+                <p>Ask questions about your documents using AI-powered retrieval</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <div class="upload-card">
+                    <h2><i class="fas fa-upload"></i> Upload Documents</h2>
+                    <p>Add new documents to your knowledge base</p>
+                    
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h3>Drag & Drop files here</h3>
+                            <p>or <span class="upload-link">click to browse</span></p>
+                            <p class="file-types">Supports PDF and TXT files</p>
+                        </div>
+                        <input type="file" id="fileInput" multiple accept=".pdf,.txt" style="display: none;">
+                    </div>
+                    
+                    <div class="upload-progress" id="uploadProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p class="progress-text" id="progressText">Uploading...</p>
+                    </div>
+                    
+                    <div class="upload-status" id="uploadStatus"></div>
+                </div>
+            </section>
+
+            <!-- Query Section -->
+            <section class="query-section">
+                <div class="query-card">
+                    <h2><i class="fas fa-question-circle"></i> Ask Questions</h2>
+                    <p>Get answers from your document collection</p>
+                    
+                    <div class="query-form">
+                        <div class="input-group">
+                            <input type="text" id="questionInput" placeholder="What would you like to know?" maxlength="500">
+                            <button id="askButton" class="ask-button">
+                                <i class="fas fa-search"></i> Ask
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="loading" id="loading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Searching documents...</p>
+                    </div>
+                    
+                    <div class="response" id="response" style="display: none;">
+                        <h3><i class="fas fa-lightbulb"></i> Answer</h3>
+                        <div class="answer-content" id="answerContent"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Status Section -->
+            <section class="status-section">
+                <div class="status-card">
+                    <h3><i class="fas fa-info-circle"></i> System Status</h3>
+                    <div class="status-items">
+                        <div class="status-item">
+                            <span class="status-label">API Status:</span>
+                            <span class="status-value" id="apiStatus">Checking...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Vector Store:</span>
+                            <span class="status-value" id="vectorStatus">Checking...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Documents:</span>
+                            <span class="status-value" id="docCount">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy;RAG System. Built with FastAPI and LangChain.</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/enhanced_app.js"></script>
+</body>
+</html>

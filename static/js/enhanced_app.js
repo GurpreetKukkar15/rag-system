@@ -1,0 +1,529 @@
+// Enhanced RAG System Frontend JavaScript
+// Based on your proposed solution with additional features
+class EnhancedRAGSystem {
+    constructor() {
+        this.apiBaseUrl = 'http://127.0.0.1:8000';
+        this.documents = [];
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.checkSystemStatus();
+        this.setupFileUpload();
+        this.loadDocuments();
+    }
+
+    setupEventListeners() {
+        // Question submission
+        const askButton = document.getElementById('askButton');
+        const questionInput = document.getElementById('questionInput');
+        
+        askButton.addEventListener('click', () => this.askQuestion());
+        questionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.askQuestion();
+            }
+        });
+
+        // Document refresh
+        const refreshButton = document.getElementById('refreshDocs');
+        refreshButton.addEventListener('click', () => this.loadDocuments());
+    }
+
+    setupFileUpload() {
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        // Click to upload
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // File input change
+        fileInput.addEventListener('change', (e) => this.handleFileUpload(e.target.files));
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            this.handleFileUpload(e.dataTransfer.files);
+        });
+    }
+
+    async checkSystemStatus() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/api/health`);
+            const data = await response.json();
+            
+            // Update status indicators
+            document.getElementById('apiStatus').textContent = 'Online';
+            document.getElementById('apiStatus').className = 'status-value ready';
+            
+            document.getElementById('vectorStatus').textContent = data.faiss ? 'Loaded' : 'Not Loaded';
+            document.getElementById('vectorStatus').className = `status-value ${data.faiss ? 'ready' : 'not-ready'}`;
+            
+            // Get document count from stats
+            const statsResponse = await fetch(`${this.apiBaseUrl}/api/stats`);
+            const stats = await statsResponse.json();
+            document.getElementById('docCount').textContent = `${stats.files.processed_files} documents`;
+            document.getElementById('docCount').className = 'status-value ready';
+            
+        } catch (error) {
+            console.error('Status check failed:', error);
+            document.getElementById('apiStatus').textContent = 'Offline';
+            document.getElementById('apiStatus').className = 'status-value not-ready';
+        }
+    }
+
+    async loadDocuments() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/api/documents`);
+            const data = await response.json();
+            
+            this.documents = data; // Database API returns array directly
+            this.displayDocuments();
+            
+        } catch (error) {
+            console.error('Failed to load documents:', error);
+            this.showNotification('Failed to load documents', 'error');
+        }
+    }
+
+    displayDocuments() {
+        const documentsList = document.getElementById('documentsList');
+        
+        if (this.documents.length === 0) {
+            documentsList.innerHTML = '<div class="no-documents">No documents uploaded yet.</div>';
+            return;
+        }
+
+        const documentsHTML = this.documents.map(doc => `
+            <div class="document-item">
+                <div class="document-info">
+                    <div class="document-name">
+                        <i class="fas fa-file-${doc.file_type.toLowerCase()}"></i>
+                        ${doc.original_filename}
+                        ${doc.processed ? '<span class="status-badge processed">✓ Processed</span>' : '<span class="status-badge pending">⏳ Processing</span>'}
+                    </div>
+                    <div class="document-details">
+                        <span class="document-type">${doc.file_type}</span>
+                        <span class="document-size">${this.formatFileSize(doc.file_size)}</span>
+                        <span class="document-chunks">${doc.chunks_created} chunks</span>
+                        <span class="document-date">${new Date(doc.upload_date).toLocaleDateString()}</span>
+                    </div>
+                </div>
+                <div class="document-actions">
+                    <button class="action-btn delete-btn" onclick="ragSystem.deleteDocument(${doc.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        documentsList.innerHTML = documentsHTML;
+    }
+
+    async deleteDocument(fileId) {
+        if (!confirm(`Are you sure you want to delete this document?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/api/documents/${fileId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.showNotification(`Document deleted successfully`, 'success');
+                this.loadDocuments();
+                this.checkSystemStatus();
+            } else {
+                const error = await response.json();
+                this.showNotification(`Delete failed: ${error.detail}`, 'error');
+            }
+        } catch (error) {
+            console.error('Delete failed:', error);
+            this.showNotification('Delete failed', 'error');
+        }
+    }
+
+    async handleFileUpload(files) {
+        if (files.length === 0) return;
+
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        // Show progress
+        uploadProgress.style.display = 'block';
+        uploadStatus.style.display = 'none';
+
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const progress = ((i + 1) / files.length) * 100;
+                
+                progressFill.style.width = `${progress}%`;
+                progressText.textContent = `Uploading ${file.name}...`;
+
+                await this.uploadFile(file);
+            }
+
+            // Success
+            uploadProgress.style.display = 'none';
+            uploadStatus.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                Successfully uploaded ${files.length} file(s). Documents are being processed...
+            `;
+            uploadStatus.className = 'upload-status success';
+            uploadStatus.style.display = 'block';
+
+            // Refresh documents and status
+            setTimeout(() => {
+                this.loadDocuments();
+                this.checkSystemStatus();
+            }, 2000);
+
+        } catch (error) {
+            console.error('Upload failed:', error);
+            uploadProgress.style.display = 'none';
+            uploadStatus.innerHTML = `
+                <i class="fas fa-exclamation-circle"></i>
+                Upload failed: ${error.message}
+            `;
+            uploadStatus.className = 'upload-status error';
+            uploadStatus.style.display = 'block';
+        }
+    }
+
+    async uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${this.apiBaseUrl}/uploadfile/`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
+        }
+
+        const result = await response.json();
+        console.log('Upload result:', result);
+        return result;
+    }
+
+    async askQuestion() {
+        const questionInput = document.getElementById('questionInput');
+        const askButton = document.getElementById('askButton');
+        const loading = document.getElementById('loading');
+        const response = document.getElementById('response');
+        const answerContent = document.getElementById('answerContent');
+
+        const question = questionInput.value.trim();
+        if (!question) return;
+
+        // Show loading state
+        askButton.disabled = true;
+        loading.style.display = 'block';
+        response.style.display = 'none';
+
+        try {
+            const apiResponse = await fetch(`${this.apiBaseUrl}/query`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ question: question })
+            });
+
+            if (!apiResponse.ok) {
+                throw new Error(`API Error: ${apiResponse.status}`);
+            }
+
+            const data = await apiResponse.json();
+            
+            // Display response with metadata
+            const responseHTML = `
+                <div class="answer-content">
+                    <div class="answer-text">${data.answer}</div>
+                    <div class="answer-metadata">
+                        <small>
+                            ⏱️ Processed in ${data.processing_time}s | 
+                            📄 ${data.documents_used} documents | 
+                            🔍 ${data.chunks_retrieved} chunks | 
+                            🆔 Query #${data.query_id}
+                        </small>
+                    </div>
+                </div>
+            `;
+            answerContent.innerHTML = responseHTML;
+            response.style.display = 'block';
+            
+            // Clear input
+            questionInput.value = '';
+
+        } catch (error) {
+            console.error('Query failed:', error);
+            answerContent.textContent = `Error: ${error.message}`;
+            response.style.display = 'block';
+        } finally {
+            // Hide loading state
+            askButton.disabled = false;
+            loading.style.display = 'none';
+        }
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+            ${message}
+        `;
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 300px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        `;
+        
+        if (type === 'success') {
+            notification.style.background = 'linear-gradient(135deg, #48bb78, #38a169)';
+        } else if (type === 'error') {
+            notification.style.background = 'linear-gradient(135deg, #f56565, #e53e3e)';
+        } else {
+            notification.style.background = 'linear-gradient(135deg, #4299e1, #3182ce)';
+        }
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+}
+
+// Initialize the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    window.ragSystem = new EnhancedRAGSystem();
+});
+
+// Add CSS animations
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+    
+    .documents-section {
+        grid-column: 1 / -1;
+    }
+    
+    .documents-card {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .documents-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+    }
+    
+    .documents-controls {
+        margin-bottom: 20px;
+    }
+    
+    .refresh-button {
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .refresh-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    .documents-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .document-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+    }
+    
+    .document-item:hover {
+        border-color: #667eea;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    }
+    
+    .document-info {
+        flex: 1;
+    }
+    
+    .document-name {
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .document-details {
+        display: flex;
+        gap: 15px;
+        font-size: 0.9rem;
+        color: #718096;
+    }
+    
+    .document-actions {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .action-btn {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .download-btn {
+        background: #48bb78;
+        color: white;
+    }
+    
+    .download-btn:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+    }
+    
+    .delete-btn {
+        background: #f56565;
+        color: white;
+    }
+    
+    .delete-btn:hover {
+        background: #e53e3e;
+        transform: translateY(-1px);
+    }
+    
+    .no-documents {
+        text-align: center;
+        color: #a0aec0;
+        font-style: italic;
+        padding: 40px;
+    }
+    
+    .loading-docs {
+        text-align: center;
+        color: #718096;
+        padding: 20px;
+    }
+    
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-weight: 500;
+        margin-left: 8px;
+    }
+    
+    .status-badge.processed {
+        background: #c6f6d5;
+        color: #22543d;
+    }
+    
+    .status-badge.pending {
+        background: #fef5e7;
+        color: #744210;
+    }
+    
+    .document-chunks {
+        color: #667eea;
+        font-weight: 500;
+    }
+    
+    .document-date {
+        color: #a0aec0;
+    }
+    
+    .answer-content {
+        margin-bottom: 15px;
+    }
+    
+    .answer-text {
+        margin-bottom: 10px;
+        line-height: 1.6;
+    }
+    
+    .answer-metadata {
+        padding: 8px 12px;
+        background: #f7fafc;
+        border-radius: 6px;
+        border-left: 3px solid #667eea;
+        color: #4a5568;
+    }
+`;
+document.head.appendChild(style);

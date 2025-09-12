@@ -38,6 +38,7 @@ from langchain_core.prompts import PromptTemplate
 vector_store = None
 embeddings = None
 llm = None
+fallback_llm = None
 
 # Configuration
 DATA_DIR = "data"
@@ -86,7 +87,7 @@ class SystemStats(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # This code runs on application startup
-    global vector_store, embeddings, llm
+    global vector_store, embeddings, llm, fallback_llm
     
     print("[STARTUP] Starting Enhanced RAG System with Database...")
     
@@ -111,16 +112,64 @@ async def lifespan(app: FastAPI):
         print(f"[WARNING] Error loading FAISS index: {e}")
         vector_store = None
     
-    # Initialize LLM (using Ollama)
+    # Initialize LLM with memory optimization
+    print("Initializing LLM...")
     try:
-        llm = OllamaLLM(model="mistral")
-        print("[OK] LLM initialized (using Ollama: mistral)")
+        # Check if Ollama is running
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        if response.status_code == 200:
+            models = response.json().get("models", [])
+            if models:
+                # Try smaller models first for memory efficiency
+                model_priority = ["tinyllama", "phi", "mistral:7b", "mistral:latest"]
+                llm_initialized = False
+                
+                for model_name in model_priority:
+                    try:
+                        print(f"[DEBUG] Trying model: {model_name}")
+                        llm = OllamaLLM(
+                            model=model_name,
+                            temperature=0.7,
+                            top_p=0.9,
+                            # Memory optimization parameters
+                            num_ctx=2048,  # Reduce context window
+                            num_predict=512,  # Limit response length
+                        )
+                        print(f"[OK] LLM initialized (using Ollama: {model_name})")
+                        llm_initialized = True
+                        break
+                    except Exception as e:
+                        print(f"[WARNING] Failed to load {model_name}: {e}")
+                        continue
+                
+                if not llm_initialized:
+                    print("[WARNING] No compatible models found, using test LLM")
+                    from langchain_community.llms.fake import FakeListLLM
+                    llm = FakeListLLM(responses=["I'm a test LLM. Please install a compatible model in Ollama."])
+            else:
+                print("[WARNING] No models found in Ollama, using test LLM")
+                from langchain_community.llms.fake import FakeListLLM
+                llm = FakeListLLM(responses=["I'm a test LLM. Please install a model in Ollama for real responses."])
+        else:
+            print("[WARNING] Ollama not responding, using test LLM")
+            from langchain_community.llms.fake import FakeListLLM
+            llm = FakeListLLM(responses=["I'm a test LLM. Please start Ollama for real responses."])
     except Exception as e:
-        print(f"[WARNING] Error initializing Ollama LLM: {e}")
-        print("   Falling back to test LLM...")
+        print(f"[WARNING] LLM initialization failed: {e}, using test LLM")
         from langchain_community.llms.fake import FakeListLLM
-        llm = FakeListLLM(responses=["I'm a test LLM. This is a placeholder response."])
-        print("[OK] LLM initialized (using test LLM fallback)")
+        llm = FakeListLLM(responses=["I'm a test LLM. Please check Ollama configuration."])
+    
+    # Initialize fallback LLM for memory issues
+    try:
+        from langchain_community.llms.fake import FakeListLLM
+        fallback_llm = FakeListLLM(responses=[
+            "I'm experiencing high memory usage. Here's a summary based on the available context:",
+            "The document contains relevant information that I can process, but I need more system resources to provide a complete response.",
+            "Please try with a smaller model or increase available memory for better performance."
+        ])
+        print("[OK] Fallback LLM initialized")
+    except Exception as e:
+        print(f"[WARNING] Fallback LLM initialization failed: {e}")
     
     print("[OK] RAG resources loaded successfully")
     
@@ -437,8 +486,23 @@ async def query_documents(
         except Exception as llm_error:
             print(f"[WARNING] LLM failed: {llm_error}")
             print("[DEBUG] Using fallback response...")
-            # Fallback response when LLM fails
-            response = f"Based on the available documents, I found {len(retrieved_docs)} relevant sections. However, I'm experiencing technical difficulties with the language model. Here's what I found:\n\n{context[:500]}..."
+            
+            # Check if it's a memory issue
+            if "memory" in str(llm_error).lower() or "2.3 GiB" in str(llm_error):
+                print("[DEBUG] Memory issue detected, using fallback LLM...")
+                if fallback_llm:
+                    try:
+                        fallback_chain = prompt_template | fallback_llm
+                        response = fallback_chain.invoke({"context": context, "question": query.question})
+                        print("[DEBUG] Fallback LLM response generated")
+                    except Exception as fallback_error:
+                        print(f"[WARNING] Fallback LLM also failed: {fallback_error}")
+                        response = f"Based on the available documents, I found {len(retrieved_docs)} relevant sections. However, I'm experiencing high memory usage. Here's what I found:\n\n{context[:500]}..."
+                else:
+                    response = f"Based on the available documents, I found {len(retrieved_docs)} relevant sections. However, I'm experiencing high memory usage. Here's what I found:\n\n{context[:500]}..."
+            else:
+                # Other LLM errors
+                response = f"Based on the available documents, I found {len(retrieved_docs)} relevant sections. However, I'm experiencing technical difficulties with the language model. Here's what I found:\n\n{context[:500]}..."
         
         processing_time = time.time() - start_time
         

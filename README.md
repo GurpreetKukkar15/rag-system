@@ -1,8 +1,8 @@
-# 🤖 Enhanced RAG System
+# Enhanced RAG System
 
 A powerful Retrieval-Augmented Generation (RAG) system built with FastAPI, LangChain, and FAISS for intelligent document question-answering.
 
-## ✨ Features
+## Features
 
 - **Document Upload**: Support for PDF and TXT files
 - **Intelligent Search**: FAISS vector store for semantic search
@@ -11,7 +11,7 @@ A powerful Retrieval-Augmented Generation (RAG) system built with FastAPI, LangC
 - **Web Interface**: Modern, responsive frontend
 - **Health Monitoring**: Comprehensive system status checks
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Local Development
 ```bash
@@ -36,7 +36,7 @@ Visit: http://localhost:8000
 ### Deploy to Vercel
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Backend**: FastAPI, Uvicorn
 - **AI/ML**: LangChain, FAISS, Sentence Transformers
@@ -44,7 +44,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 - **Frontend**: HTML, CSS, JavaScript
 - **LLM**: Ollama (Mistral)
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 rag-system/
@@ -60,7 +60,7 @@ rag-system/
 └── vercel.json       # Vercel configuration
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 - `OLLAMA_URL`: Ollama server URL (default: http://localhost:11434)
@@ -72,7 +72,7 @@ The system automatically creates and manages a SQLite database with:
 - Query history
 - System statistics
 
-## 📊 API Endpoints
+## API Endpoints
 
 - `GET /` - Web interface
 - `GET /api/health` - System health check
@@ -81,18 +81,18 @@ The system automatically creates and manages a SQLite database with:
 - `POST /query` - Ask questions
 - `GET /docs` - API documentation
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
 
-## 📄 License
+## License
 
 This project is open source and available under the MIT License.
 
-## 🆘 Support
+## Support
 
 For issues and questions:
 1. Check the [troubleshooting guide](DEPLOYMENT.md#troubleshooting)
@@ -101,4 +101,4 @@ For issues and questions:
 
 ---
 
-**Built with ❤️ using FastAPI and LangChain**
+**Built with FastAPI and LangChain**

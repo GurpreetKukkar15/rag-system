@@ -121,7 +121,7 @@ async def lifespan(app: FastAPI):
             models = response.json().get("models", [])
             if models:
                 # Try smaller models first for memory efficiency
-                model_priority = ["tinyllama", "phi", "mistral:7b", "mistral:latest"]
+                model_priority = ["phi", "tinyllama", "mistral:7b", "mistral:latest"]
                 llm_initialized = False
                 
                 for model_name in model_priority:

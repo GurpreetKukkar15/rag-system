@@ -9,7 +9,6 @@ A Retrieval-Augmented Generation system built with FastAPI, LangChain, and FAISS
 - AI-powered Q&A with Ollama LLM integration
 - SQLite database for tracking documents and queries
 - Modern web interface with real-time status
-- Health monitoring and system diagnostics
 
 ## Technology Stack
 
@@ -210,3 +209,4 @@ For issues:
 ---
 
 Built with FastAPI and LangChain
+
